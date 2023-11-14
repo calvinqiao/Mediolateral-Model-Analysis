@@ -34,6 +34,11 @@ function model = fit(folders, static_trials, effec_trials_all, ...
     model = struct();
     if strcmp(FITTING_MODE, '2nd-order')
         p = polyfit(widthss, slopess(:, 2), 2);
+        [B, info] = lasso([x x.^2],y);
+        [~,ind] = min(info.Intercept); %round(size(B,2)*3/4);
+        p = zeros(3,1);
+        Bselect = B(:,ind); interp = info.Intercept(ind);
+        p(1) = Bselect(1); p(2) = Bselect(2); p(3) = interp; 
         model.eq = @(x) p(1) * x.^2 + p(2) * x + p(3);
     end
     if strcmp(FITTING_MODE, '1st-order')
@@ -45,7 +50,10 @@ function model = fit(folders, static_trials, effec_trials_all, ...
 end
 
 function do_plot(x, y, fold_i)
-        % Perform linear regression
+    check = isnan(x);
+    x(check) = []; y(check) = [];
+    % Perform linear regression
+    
     coefficients = polyfit(x, y, 2); % Fit a first-degree polynomial (line)
 
     % Generate points for the regression line
@@ -59,11 +67,17 @@ function do_plot(x, y, fold_i)
     SStotal = sum((y - yMean).^2);
     rSquared = 1 - SSres / SStotal;
 
+    [B, info] = lasso([x x.^2],y);
+    [~,ind] = min(info.Intercept); %round(size(B,2)*3/4);
+    Bselect = B(:,ind); interp = info.Intercept(ind);
+    ytil = interp+...
+        x.*Bselect(1)+x.^2.*Bselect(2);
     % Plot the data points and regression line
     figure;
     plot(x, y, 'o', 'MarkerSize', 8); % Plot data points as circles
     hold on;
-    plot(x, yLine, 'r*', 'LineWidth', 2); % Plot regression line
+    % plot(x, yLine, 'r*', 'LineWidth', 2); % Plot regression line
+    plot(x, ytil, 'r*');
     hold off;
 
     % Add labels and title
@@ -71,9 +85,9 @@ function do_plot(x, y, fold_i)
     xlabel('x'); ylabel('y');
     title('Regression');
     legend('Data', 'Regression');
-    
+    % 
     % Display R^2 on the graph
-    text(max(x), max(y), sprintf('R^2 = %.4f', rSquared), 'HorizontalAlignment', 'right');
+    % text(max(x), max(y), sprintf('R^2 = %.4f', rSquared), 'HorizontalAlignment', 'right');
     saveas(gcf, strcat('Fold-', num2str(fold_i), '_regression_plot.png'));
     close;
     % figure;
